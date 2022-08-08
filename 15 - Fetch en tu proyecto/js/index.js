@@ -3,6 +3,7 @@
 // Se necesitan 16 ladrillos huecos x m2
 // Se necesitan 13 bloques de hormigon x m2
 // 18kg de cemento x m2 de pared
+// 9Kg de cal x m2 de pared
 // 0.04 m3 de Arena x m2 de pared
 
 /*La intención es que la calculadora solo admita numeros en las medidas y 
@@ -211,13 +212,20 @@ class Materiales {
 }
 
 
-// Materiales que utilizo en el asistente.
-const material1 = new Materiales(1, "Arena", 1, "Arena x m3", 5000, "./img/materiales/arena.png");
-const material2 = new Materiales(2, "Cal", 1, "Cal Milagro x 25Kg", 1573, "./img/materiales/cal.png");
-const material3 = new Materiales(3, "Cemento", 1, "Cemento Avellaneda x 50Kg", 1202, "./img/materiales/cemento.png");
-const material4 = new Materiales(4, "Ladrillo Comun", 1, "Ladrillo Comun 5.5x18x25", 35, "./img/materiales/ladrillo-comun.png");
-const material5 = new Materiales(5, "Ladrillo Hueco", 1, "Ladrillo Hueco 12x18x33", 98, "./img/materiales/ladrillo-hueco12.png");
-const material6 = new Materiales(6, "Bloque Hormigon", 1, "Bloque Liso 19x19x39", 200, "./img/materiales/ladrillo-bloque.png");
+//Genero una funcion asyncronica, para traerme los productos de un json
+const cargar = async () => {
+    const response = await fetch("./json/data.json");
+    const items = await response.json();
+    items.forEach(item => {
+        productos.push(new Materiales(item.id, item.nombre, item.cantidad, item.descripcion, item.precio, item.img))
+    })
+}
+//Englobo en otra funcion asyncronica la funcion que renderiza los productos, para que espere la carga del arreglo.
+const agruparAsync = async () => {
+    await cargar();
+    mostrarProductos(productos)
+    console.log(productos);
+}
 
 
 //Comienzo a escuchar el Asistente de Compra
@@ -238,27 +246,33 @@ function validarCalculo(e) {
     e.preventDefault() //Evito que se recargue el formulario
     sessionStorage.setItem("ancho", e.target.children[0].children[1].value); //cargo en una variable el valor del formulario
     sessionStorage.setItem("alto", e.target.children[1].children[1].value); //cargo en una variable el valor del formulario
-    sessionStorage.setItem("tipo", e.target.children[2].children[0].value); //cargo en una variable el valor del formulario
-    asistente();
-}
+    //sessionStorage.setItem("tipo", e.target.children[2].children[0].value); //cargo en una variable el valor del formulario
+    const existe = productos.find(prod => prod.id == e.target.children[2].children[0].value)
+    sessionStorage.setItem("tipo", JSON.stringify(existe))
+    asistente()
+    }
 
 //Creo una gran funcion, que engloba todas las funciones del asistente
 function asistente() {
 
     let ancho = sessionStorage.getItem("ancho")
     let alto = sessionStorage.getItem("alto")
-    let tipo = sessionStorage.getItem("tipo")
+    let tipo = JSON.parse(sessionStorage.getItem("tipo"))
+    let arena = productos.find(prod => prod.nombre == "Arena")
+    let cal = productos.find(prod => prod.nombre == "Cal")
+    let cemento = productos.find(prod => prod.nombre == "Cemento")
+
 
     // Calculo los m2 en base al imput del usuario y devuelvo la cantidad de ladrillos según el tipo solicitado.
     function computo(ancho, alto) {
-        switch (tipo) {
-            case "4":
+        switch (tipo.nombre) {
+            case "Ladrillo Comun":
                 return 60 * ancho * alto;
 
-            case "5":
+            case "Ladrillo Hueco":
                 return 16 * ancho * alto;
 
-            case "6":
+            case "Bloque Hormigon":
                 return 13 * ancho * alto;
 
             default:
@@ -269,47 +283,19 @@ function asistente() {
     // Almaceno en una variable la superficie de la pared, para luego calcular cemento y arena en un futuro
     let superficie = (ancho * alto);
 
-
-    //Declaro una función "anotaciion", que la uso para unir el dato ingresado por el usuario, con mi lista de materiales.
-    function anotacion(dato) {
-        switch (dato) {
-            case "4":
-                return material4;
-
-            case "5":
-                return material5;
-
-            case "6":
-                return material6;
-
-            default:
-                return 0;
-        }
-    }
-
-    //Genero una funcion, para calcular el precio, según el material elegido y su precio.
-    function calcularPrecio(info, info2) {
-        switch (info) {
-            case "4":
-                return material4.precio * info2;
-
-            case "5":
-                return material5.precio * info2;
-
-            case "6":
-                return material6.precio * info2;
-
-            default:
-                return 0;
-        }
-    }
-
     // Calculo de CEMENTO (18Kg x m2)
     function calcularCemento(parametro) {
         return parametro * 18;
     }
     // Almaceno en una variable, la cantidad de cemento en Kg, según la supercifie calculada anteriormente.
     let resultadoCemento = calcularCemento(superficie);
+    
+    // Calculo de Cal (9Kg x m2)
+    function calcularCal(parametro) {
+        return parametro * 9;
+    }
+    // Almaceno en una variable, la cantidad de cemento en Kg, según la supercifie calculada anteriormente.
+    let resultadoCal = calcularCal(superficie);
 
     // Calculo de ARENA
     function calcularArena(parametro) {
@@ -332,7 +318,6 @@ function asistente() {
         })
         swalWithBootstrapButtons.fire({
             title: 'Usted necesita:',
-            text: `${resultado} ${tipo} \n ${resultadoCemento} Kg de ${material3.nombre} \n ${resultadoArena} m3 de ${material1.nombre}`,
             html: `<table class="table">
         <thead>
             <tr>
@@ -344,18 +329,23 @@ function asistente() {
         <tbody>
             <tr>
                 <th scope="row">1</th>
-                <td>Ladrillos ${tipo}</td>
+                <td>${tipo.nombre}</td>
                 <td>${resultado} Unidades</td>
             </tr>
             <tr>
                 <th scope="row">2</th>
-                <td>${material3.nombre}</td>
+                <td>${cemento.nombre}</td>
                 <td>${resultadoCemento} Kg</td>
             </tr>
             <tr>
                 <th scope="row">2</th>
-                <td>${material1.nombre}</td>
+                <td>${arena.nombre}</td>
                 <td>${resultadoArena} m3</td>
+            </tr>
+            <tr>
+                <th scope="row">2</th>
+                <td>${cal.nombre}</td>
+                <td>${resultadoCal} Kg</td>
             </tr>
         </tbody>
     </table>`,
@@ -383,13 +373,14 @@ function asistente() {
                 )
             }
         })
-        agregarAlCarritoAsistente(anotacion(tipo).id, (anotacion(tipo).cantidad) * resultado);
-        console.log((anotacion(tipo).cantidad) * resultado);
-        /* // Alimento el arreglo Carrito, con Cantidad de ladrillos, tipo de material y el subtotal para ese item.
-        carrito.push(resultado, anotacion(tipo), calcularPrecio(tipo, resultado));
-        // Alimento el arreglo Carrito, calculando la cantidad de bolsas de cemento, según los Kg calculados. tambien subo tipo de material y el subtotal para ese item.
-        carrito.push(Math.round((calcularCemento(superficie) / 50)), material3, material3.precio * Math.round((calcularCemento(superficie) / 50)));
-        carrito.push((Math.ceil(calcularArena(superficie))), material1, material1.precio * Math.ceil(calcularArena(superficie))); */
+        // Alimento el arreglo Carrito, con Cantidad de ladrillos, tipo de material y el subtotal para ese item.
+        agregarAlCarritoAsistente(tipo.id, tipo.cantidad * resultado);
+        //Alimento el Carrito, calculando la cantidad de bolsas de cemento, según los Kg calculados.
+        agregarAlCarritoAsistente(cemento.id, Math.ceil(calcularCemento(superficie) / 50));
+        //Alimento el carrito con la cantidad de arena calculada
+        agregarAlCarritoAsistente(arena.id, Math.ceil(calcularArena(superficie)));
+        //Alimento el carrito con la cantidad de cal calculada
+        agregarAlCarritoAsistente(cal.id, Math.ceil(calcularCal(superficie) / 25));
     } else {
         Swal.fire('Debes ingresar las medidas de tu muro y el tipo de ladrillo, para que podamos ayudarte con tu proyecto')
     }
@@ -400,7 +391,7 @@ const agregarAlCarritoAsistente = (prodId, cant) => {
     const existe = carrito.some(prod => prod.id === prodId)
     if (existe) { //valido si existe el item en el carrito
         const temp = carrito.map(prod => {
-            prod.id === prodId && (prod.cantidad + cant) //sumo la cantidad del asistente a la cantidad existente
+            prod.id === prodId && prod.cantidad + cant //sumo la cantidad del asistente a la cantidad existente
         })
     } else { //si no existe en el carrito
         const item = productos.find((prod) => prod.id === prodId);
@@ -433,20 +424,7 @@ let productos = []
 //Genero un arreglo vacio, para usar de carrito
 let carrito = [];
 
-//Genero una funcion asyncronica, para traerme los productos de un json
-const cargar = async () => {
-    const response = await fetch("./json/data.json");
-    const items = await response.json();
-    items.forEach(item => {
-        productos.push(new Materiales(item.id, item.nombre, item.cantidad, item.descripcion, item.precio, item.img))
-    })
-}
-//Englobo en otra funcion asyncronica la funcion que renderiza los productos, para que espere la carga del arreglo.
-const agruparAsync = async () => {
-    await cargar();
-    mostrarProductos(productos)
-    console.log(productos);
-}
+
 
 
 //Creo una funcion para generar mis productos medianete DOM
@@ -544,7 +522,6 @@ const actualizarCarrito = () => {
     //Modifico el precio total
     const precioTotal = document.getElementById("precioTotal");
     precioTotal.innerText = carrito.reduce((acc, prod) => acc + prod.precio * prod.cantidad, 0)
-    console.log(carrito);
     //Almaceno el carrito y uso como clave el correo del usuario, para recuperar productos
     localStorage.setItem(sessionStorage.userCarrito, JSON.stringify(carrito))
 }
@@ -557,5 +534,4 @@ function checkUserCarrito() {
     if (carritotemp) {
         carrito.push(...carritotemp)
     }
-    console.log(carrito);
 }
